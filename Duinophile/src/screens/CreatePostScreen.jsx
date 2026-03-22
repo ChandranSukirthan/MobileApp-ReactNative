@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -15,19 +16,51 @@ import {
 import { launchImageLibrary } from 'react-native-image-picker';
 import { COLORS } from '../constants/colors';
 import { ACHIEVEMENT_TYPES } from '../constants/types';
-import { createPost } from '../services/postService';
+import { createPost, updatePost } from '../services/postService';
+import { DEMO_USER_ID } from '../constants/demoUser';
 
-const DEMO_USER_ID = '507f1f77bcf86cd799439011';
-
-const CreatePostScreen = ({ navigation }) => {
+const CreatePostScreen = ({ navigation, route }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [achievementType, setAchievementType] = useState('ARDUINO_TASK');
   const [level, setLevel] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [image, setImage] = useState(null);
+  const [remoteImageUri, setRemoteImageUri] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  const editPost = route.params?.post;
+  const isEdit = Boolean(editPost?._id);
+
+  const resetForm = useCallback(() => {
+    setTitle('');
+    setDescription('');
+    setAchievementType('ARDUINO_TASK');
+    setLevel('');
+    setIsPublic(true);
+    setImage(null);
+    setRemoteImageUri(null);
+    setErrors({});
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const p = route.params?.post;
+      if (p?._id) {
+        setTitle(p.title || '');
+        setDescription(p.description || '');
+        setAchievementType(p.achievementType || 'ARDUINO_TASK');
+        setLevel(p.level != null ? String(p.level) : '');
+        setIsPublic(p.isPublic !== false);
+        setImage(null);
+        setRemoteImageUri(p.image || null);
+        setErrors({});
+      } else {
+        resetForm();
+      }
+    }, [route.params?.post, resetForm]),
+  );
 
   const validate = () => {
     const newErrors = {};
@@ -68,27 +101,34 @@ const CreatePostScreen = ({ navigation }) => {
 
     try {
       setLoading(true);
-      await createPost({
+      const payload = {
         title: title.trim(),
         description: description.trim(),
         achievementType,
         level: level ? Number(level) : null,
         isPublic,
         image,
-        userId: DEMO_USER_ID,
-      });
+      };
 
-      Alert.alert('Success! 🎉', 'Your achievement has been published!', [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+      if (isEdit) {
+        await updatePost(editPost._id, payload);
+        Alert.alert('Updated', 'Your post was saved.', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        await createPost({
+          ...payload,
+          userId: DEMO_USER_ID,
+        });
+        Alert.alert('Success! 🎉', 'Your achievement has been published!', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      }
     } catch (error) {
       Alert.alert(
-        'Note',
-        'Post saved locally. Connect to server to sync.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+        isEdit ? 'Could not save' : 'Could not publish',
+        error?.message ||
+          'Check that the API is running and MongoDB is connected.',
       );
     } finally {
       setLoading(false);
@@ -108,10 +148,20 @@ const CreatePostScreen = ({ navigation }) => {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>
-            Create <Text style={styles.headerTitleBlue}>New</Text> Achievement
+            {isEdit ? (
+              <>
+                Edit <Text style={styles.headerTitleBlue}>Achievement</Text>
+              </>
+            ) : (
+              <>
+                Create <Text style={styles.headerTitleBlue}>New</Text> Achievement
+              </>
+            )}
           </Text>
           <Text style={styles.headerSubtitle}>
-            Share your Arduino progress with the Duinophile community
+            {isEdit
+              ? 'Update your post — changes sync to your profile and the feed.'
+              : 'Share your Arduino progress with the Duinophile community'}
           </Text>
         </View>
       </View>
@@ -222,9 +272,9 @@ const CreatePostScreen = ({ navigation }) => {
             <TouchableOpacity
               style={styles.imageUpload}
               onPress={handleImagePick}>
-              {image ? (
+              {image || remoteImageUri ? (
                 <Image
-                  source={{ uri: image.uri }}
+                  source={{ uri: image?.uri || remoteImageUri }}
                   style={styles.previewImage}
                   resizeMode="cover"
                 />
@@ -240,13 +290,13 @@ const CreatePostScreen = ({ navigation }) => {
                 </View>
               )}
             </TouchableOpacity>
-            {image && (
+            {image ? (
               <TouchableOpacity
                 style={styles.removeImageBtn}
                 onPress={() => setImage(null)}>
-                <Text style={styles.removeImageText}>✕ Remove Image</Text>
+                <Text style={styles.removeImageText}>✕ Remove new image</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
 
           {/* Level */}
@@ -298,7 +348,9 @@ const CreatePostScreen = ({ navigation }) => {
             {loading ? (
               <ActivityIndicator color={COLORS.textWhite} size="small" />
             ) : (
-              <Text style={styles.submitBtnText}>✏️  Publish Achievement</Text>
+              <Text style={styles.submitBtnText}>
+                {isEdit ? '💾  Save changes' : '✏️  Publish Achievement'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>

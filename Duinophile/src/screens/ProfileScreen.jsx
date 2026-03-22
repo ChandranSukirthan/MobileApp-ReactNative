@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -15,14 +16,7 @@ import PostCard from '../components/PostCard';
 import DeleteModal from '../components/DeleteModal';
 import { getPostsByUser, deletePost } from '../services/postService';
 import { getInitials } from '../utils/helpers';
-
-const DEMO_USER = {
-  _id: '507f1f77bcf86cd799439011',
-  name: 'Sukirthan',
-  email: 'sukirthan@gmail.com',
-  bio: 'Arduino enthusiast & maker',
-  streak: 7,
-};
+import { DEMO_USER } from '../constants/demoUser';
 
 const ProfileScreen = ({ navigation }) => {
   const [posts, setPosts] = useState([]);
@@ -32,52 +26,28 @@ const ProfileScreen = ({ navigation }) => {
   const [selectedPost, setSelectedPost] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchUserPosts = async () => {
+  const fetchUserPosts = useCallback(async () => {
     try {
       const data = await getPostsByUser(DEMO_USER._id);
       setPosts(data || []);
     } catch (error) {
-      // Demo data
-      setPosts([
-        {
-          _id: '1',
-          title: 'My Arduino LED Project',
-          description: 'Built a cool LED matrix display!',
-          achievementType: 'MODULE_COMPLETED',
-          level: 77,
-          likes: [],
-          comments: [],
-          isPublic: true,
-          createdAt: new Date('2026-03-06T20:21:00').toISOString(),
-          user: DEMO_USER,
-        },
-        {
-          _id: '2',
-          title: 'Hardware Challenge Done!',
-          description: 'Completed the temperature sensor challenge.',
-          achievementType: 'MODULE_COMPLETED',
-          level: 23,
-          likes: [1, 2, 3, 4],
-          comments: [{ text: 'Great job!' }],
-          isPublic: true,
-          createdAt: new Date('2026-03-06T17:44:00').toISOString(),
-          user: DEMO_USER,
-        },
-      ]);
+      setPosts([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUserPosts();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserPosts();
+    }, [fetchUserPosts]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchUserPosts();
-  }, []);
+  }, [fetchUserPosts]);
 
   const handleDeletePress = post => {
     setSelectedPost(post);
@@ -146,7 +116,7 @@ const ProfileScreen = ({ navigation }) => {
       {/* Create Post Button */}
       <TouchableOpacity
         style={styles.createBtn}
-        onPress={() => navigation.navigate('CreatePost')}>
+        onPress={() => navigation.navigate('CreatePost', {})}>
         <Text style={styles.createBtnText}>+ Share New Achievement</Text>
       </TouchableOpacity>
 
@@ -183,7 +153,7 @@ const ProfileScreen = ({ navigation }) => {
         </View>
         <TouchableOpacity
           style={styles.shareBtn}
-          onPress={() => navigation.navigate('CreatePost')}>
+          onPress={() => navigation.navigate('CreatePost', {})}>
           <Text style={styles.shareBtnText}>+ Share Achievement</Text>
         </TouchableOpacity>
       </View>
@@ -196,6 +166,7 @@ const ProfileScreen = ({ navigation }) => {
             post={item}
             userId={DEMO_USER._id}
             onPress={handlePostPress}
+            onEdit={p => navigation.navigate('CreatePost', { post: p })}
             onDelete={handleDeletePress}
             showDelete={true}
           />
@@ -210,7 +181,7 @@ const ProfileScreen = ({ navigation }) => {
             </Text>
             <TouchableOpacity
               style={styles.emptyBtn}
-              onPress={() => navigation.navigate('CreatePost')}>
+              onPress={() => navigation.navigate('CreatePost', {})}>
               <Text style={styles.emptyBtnText}>Create Post</Text>
             </TouchableOpacity>
           </View>

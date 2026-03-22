@@ -36,3 +36,15 @@ export const truncateText = (text, maxLength = 100) => {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';
 };
+
+export const userHasLiked = (likes, userId) => {
+  if (!likes?.length || !userId) return false;
+  const uid = String(userId);
+  return likes.some(entry => {
+    const id =
+      entry && typeof entry === 'object' && entry._id != null
+        ? String(entry._id)
+        : String(entry);
+    return id === uid;
+  });
+};

@@ -37,9 +37,7 @@ export const createPost = async postData => {
   }
 
   const response = await api.post('/api/posts', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    timeout: 120000,
   });
   return response.data;
 };
@@ -47,10 +45,19 @@ export const createPost = async postData => {
 // Update post
 export const updatePost = async (postId, postData) => {
   const formData = new FormData();
-  if (postData.title) formData.append('title', postData.title);
-  if (postData.description) formData.append('description', postData.description);
-  if (postData.achievementType) formData.append('achievementType', postData.achievementType);
-  if (postData.level) formData.append('level', postData.level.toString());
+  formData.append('title', postData.title);
+  formData.append('description', postData.description ?? '');
+  formData.append('achievementType', postData.achievementType);
+  formData.append(
+    'level',
+    postData.level != null && postData.level !== ''
+      ? String(postData.level)
+      : '',
+  );
+  formData.append(
+    'isPublic',
+    postData.isPublic !== false ? 'true' : 'false',
+  );
 
   if (postData.image) {
     formData.append('image', {
@@ -61,9 +68,7 @@ export const updatePost = async (postId, postData) => {
   }
 
   const response = await api.put(`/api/posts/${postId}`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    timeout: 120000,
   });
   return response.data;
 };

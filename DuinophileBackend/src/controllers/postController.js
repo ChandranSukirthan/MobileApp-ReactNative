@@ -1,6 +1,12 @@
 const Post = require('../models/Post');
 const { successResponse, errorResponse } = require('../utils/response');
 
+const parseBool = value => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value === 'true';
+  return true;
+};
+
 
 const getAllPosts = async (req, res, next) => {
   try {
@@ -67,7 +73,7 @@ const createPost = async (req, res, next) => {
       description,
       achievementType,
       level: level ? Number(level) : null,
-      isPublic: isPublic !== undefined ? isPublic : true,
+      isPublic: isPublic !== undefined ? parseBool(isPublic) : true,
       image: imageUrl,
       user: userId,
     });
@@ -98,14 +104,23 @@ const updatePost = async (req, res, next) => {
       ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`
       : post.image;
 
+    const nextLevel =
+      level === undefined
+        ? post.level
+        : level === '' || level === null
+          ? null
+          : Number(level);
+
     const updatedPost = await Post.findByIdAndUpdate(
       req.params.id,
       {
-        title: title || post.title,
-        description: description || post.description,
+        title: title !== undefined ? title : post.title,
+        description:
+          description !== undefined ? description : post.description,
         achievementType: achievementType || post.achievementType,
-        level: level ? Number(level) : post.level,
-        isPublic: isPublic !== undefined ? isPublic : post.isPublic,
+        level: nextLevel,
+        isPublic:
+          isPublic !== undefined ? parseBool(isPublic) : post.isPublic,
         image: imageUrl,
       },
       { new: true, runValidators: true }
@@ -144,10 +159,11 @@ const likePost = async (req, res, next) => {
       return errorResponse(res, 'Post not found', 404);
     }
 
-    const isLiked = post.likes.includes(userId);
+    const uid = String(userId);
+    const isLiked = post.likes.some(id => id.toString() === uid);
 
     if (isLiked) {
-      post.likes = post.likes.filter(id => id.toString() !== userId);
+      post.likes = post.likes.filter(id => id.toString() !== uid);
     } else {
       post.likes.push(userId);
     }

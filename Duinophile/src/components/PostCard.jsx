@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,18 +6,29 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Share,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 import AchievementBadge from './AchievementBadge';
-import { formatDate, getInitials } from '../utils/helpers';
+import { formatDate, getInitials, userHasLiked } from '../utils/helpers';
 import { likePost } from '../services/postService';
 
-const PostCard = ({ post, userId, onDelete, onPress, showDelete = false }) => {
+const PostCard = ({
+  post,
+  userId,
+  onDelete,
+  onEdit,
+  onPress,
+  showDelete = false,
+}) => {
   const [likes, setLikes] = useState(post.likes?.length || 0);
-  const [isLiked, setIsLiked] = useState(
-    post.likes?.includes(userId) || false
-  );
+  const [isLiked, setIsLiked] = useState(userHasLiked(post.likes, userId));
   const [likeLoading, setLikeLoading] = useState(false);
+
+  useEffect(() => {
+    setLikes(post.likes?.length || 0);
+    setIsLiked(userHasLiked(post.likes, userId));
+  }, [post._id, post.likes, userId]);
 
   const handleLike = async () => {
     if (!userId) {
@@ -30,9 +41,21 @@ const PostCard = ({ post, userId, onDelete, onPress, showDelete = false }) => {
       setLikes(response.likes);
       setIsLiked(response.isLiked);
     } catch (error) {
-      Alert.alert('Error', 'Failed to like post');
+      Alert.alert('Error', error?.message || 'Failed to update like');
     } finally {
       setLikeLoading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const parts = [post.title || 'Duinophile post'];
+      if (post.description) parts.push(post.description);
+      await Share.share({ message: parts.join('\n\n') });
+    } catch (e) {
+      if (e?.message !== 'User did not share') {
+        Alert.alert('Share', 'Could not open share sheet.');
+      }
     }
   };
 
@@ -63,11 +86,20 @@ const PostCard = ({ post, userId, onDelete, onPress, showDelete = false }) => {
           </View>
 
           {showDelete && (
-            <TouchableOpacity
-              style={styles.menuBtn}
-              onPress={() => onDelete && onDelete(post)}>
-              <Text style={styles.menuIcon}>⋯</Text>
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {onEdit ? (
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => onEdit(post)}>
+                  <Text style={styles.editBtnText}>Edit</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={styles.menuBtn}
+                onPress={() => onDelete && onDelete(post)}>
+                <Text style={styles.menuIcon}>⋯</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -117,7 +149,7 @@ const PostCard = ({ post, userId, onDelete, onPress, showDelete = false }) => {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
             <Text style={styles.actionIcon}>↗️</Text>
             <Text style={styles.actionText}>Share</Text>
           </TouchableOpacity>
@@ -182,6 +214,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: COLORS.inputBg,
+  },
+  editBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.blue,
   },
   menuBtn: {
     padding: 8,

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -12,8 +13,7 @@ import {
 import { COLORS } from '../constants/colors';
 import PostCard from '../components/PostCard';
 import { getAllPosts } from '../services/postService';
-
-const DEMO_USER_ID = '507f1f77bcf86cd799439011';
+import { DEMO_USER_ID } from '../constants/demoUser';
 
 const HomeScreen = ({ navigation }) => {
   const [posts, setPosts] = useState([]);
@@ -21,66 +21,33 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       setError(null);
       const data = await getAllPosts();
       setPosts(data || []);
     } catch (err) {
-      setError('Failed to load posts. Check your connection.');
-      // Demo data when API is not available
-      setPosts([
-        {
-          _id: '1',
-          title: 'My First Arduino Project',
-          description: 'Built a LED blinker with Arduino Uno!',
-          achievementType: 'ARDUINO_TASK',
-          level: 1,
-          likes: [],
-          comments: [],
-          isPublic: true,
-          createdAt: new Date().toISOString(),
-          user: { name: 'Sukirthan', avatar: null },
-        },
-        {
-          _id: '2',
-          title: '7 Day Learning Streak!',
-          description: 'Completed 7 consecutive days of Arduino learning.',
-          achievementType: 'STREAK_7',
-          level: 7,
-          likes: [],
-          comments: [{ text: 'Amazing!' }],
-          isPublic: true,
-          createdAt: new Date().toISOString(),
-          user: { name: 'Arun', avatar: null },
-        },
-        {
-          _id: '3',
-          title: 'Hardware Challenge Complete',
-          description: 'Built a temperature sensor circuit!',
-          achievementType: 'HARDWARE_CHALLENGE',
-          level: 5,
-          likes: [],
-          comments: [],
-          isPublic: true,
-          createdAt: new Date().toISOString(),
-          user: { name: 'Priya', avatar: null },
-        },
-      ]);
+      setError(
+        err?.message ||
+          'Failed to load posts. Start DuinophileBackend (npm start) and check apiConfig.js IP.',
+      );
+      setPosts([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    fetchPosts();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPosts();
+    }, [fetchPosts]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchPosts();
-  }, []);
+  }, [fetchPosts]);
 
   const handlePostPress = post => {
     navigation.navigate('PostDetail', { post, userId: DEMO_USER_ID });
@@ -104,7 +71,7 @@ const HomeScreen = ({ navigation }) => {
       {/* Buttons */}
       <TouchableOpacity
         style={styles.primaryBtn}
-        onPress={() => navigation.navigate('CreatePost')}>
+        onPress={() => navigation.navigate('CreatePost', {})}>
         <Text style={styles.primaryBtnText}>✏️  Share Achievement</Text>
       </TouchableOpacity>
 
@@ -197,7 +164,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
         <TouchableOpacity
           style={styles.shareBtn}
-          onPress={() => navigation.navigate('CreatePost')}>
+          onPress={() => navigation.navigate('CreatePost', {})}>
           <Text style={styles.shareBtnText}>+ Share Achievement</Text>
         </TouchableOpacity>
       </View>

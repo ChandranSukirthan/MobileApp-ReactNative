@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "adb-reverse": "adb reverse tcp:5000 tcp:5000",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",

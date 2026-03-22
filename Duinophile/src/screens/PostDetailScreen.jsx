@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,21 +12,57 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Share,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../constants/colors';
 import AchievementBadge from '../components/AchievementBadge';
-import { formatDate, getInitials } from '../utils/helpers';
-import { addComment, likePost } from '../services/postService';
+import { formatDate, getInitials, userHasLiked } from '../utils/helpers';
+import { addComment, likePost, getPostById } from '../services/postService';
 
 const PostDetailScreen = ({ route, navigation }) => {
   const { post: initialPost, userId } = route.params;
+  const postId = initialPost._id;
   const [post, setPost] = useState(initialPost);
   const [comment, setComment] = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
   const [likes, setLikes] = useState(initialPost.likes?.length || 0);
   const [isLiked, setIsLiked] = useState(
-    initialPost.likes?.includes(userId) || false
+    userHasLiked(initialPost.likes, userId),
   );
+
+  const ownerId = post.user?._id || post.user;
+  const canEdit =
+    Boolean(userId && ownerId && String(ownerId) === String(userId));
+
+  const refreshPost = useCallback(async () => {
+    try {
+      const data = await getPostById(postId);
+      setPost(data);
+      setLikes(data.likes?.length || 0);
+      setIsLiked(userHasLiked(data.likes, userId));
+    } catch (e) {
+      // keep existing local state
+    }
+  }, [postId, userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshPost();
+    }, [refreshPost]),
+  );
+
+  const handleShare = async () => {
+    try {
+      const parts = [post.title || 'Duinophile post'];
+      if (post.description) parts.push(post.description);
+      await Share.share({ message: parts.join('\n\n') });
+    } catch (e) {
+      if (e?.message !== 'User did not share') {
+        Alert.alert('Share', 'Could not open share sheet.');
+      }
+    }
+  };
 
   const handleLike = async () => {
     try {
@@ -34,8 +70,7 @@ const PostDetailScreen = ({ route, navigation }) => {
       setLikes(response.likes);
       setIsLiked(response.isLiked);
     } catch (error) {
-      setLikes(prev => (isLiked ? prev - 1 : prev + 1));
-      setIsLiked(!isLiked);
+      Alert.alert('Error', error?.message || 'Could not update like');
     }
   };
 
@@ -50,17 +85,7 @@ const PostDetailScreen = ({ route, navigation }) => {
       setPost(prev => ({ ...prev, comments }));
       setComment('');
     } catch (error) {
-      const newComment = {
-        _id: Date.now().toString(),
-        text: comment.trim(),
-        user: { name: 'You', avatar: null },
-        createdAt: new Date().toISOString(),
-      };
-      setPost(prev => ({
-        ...prev,
-        comments: [...(prev.comments || []), newComment],
-      }));
-      setComment('');
+      Alert.alert('Error', error?.message || 'Could not add comment');
     } finally {
       setCommentLoading(false);
     }
@@ -79,8 +104,21 @@ const PostDetailScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Post Detail</Text>
-        <View style={{ width: 60 }} />
+        <Text style={styles.headerTitleCenter}>Post Detail</Text>
+        <View style={styles.headerRight}>
+          {canEdit ? (
+            <TouchableOpacity
+              style={styles.headerAction}
+              onPress={() =>
+                navigation.navigate('CreatePost', { post })
+              }>
+              <Text style={styles.headerActionText}>Edit</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={styles.headerAction} onPress={handleShare}>
+            <Text style={styles.headerActionText}>Share</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -237,6 +275,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.textPrimary,
+  },
+  headerTitleCenter: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 88,
+    justifyContent: 'flex-end',
+  },
+  headerAction: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  headerActionText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.blue,
   },
   scrollView: {
     flex: 1,

@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: COLORS.textWhite,
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: 15,
   },
   deleteBtn: {
